@@ -54,7 +54,8 @@ supabase/        Auth linkage, trigger, RLS, seed (see supabase/README.md)
 deploy/          systemd units, Caddyfile, VPS bootstrap script
 instapy-00/      vendored InstaPy checkout
 Dockerfile       web app image        Dockerfile.worker  worker image
-docker-compose.yml  web + worker      render.yaml        Render blueprint
+docker-compose.yml  web + worker      netlify.toml       Netlify web app
+render.yaml      Render alternative   .githooks/         secret-scan pre-commit
 ```
 
 ## Quickstart (local)
@@ -81,18 +82,21 @@ are promoted to admin on first login.
 
 ## Deploy
 
-**Web app on Render** (free, no credit card, no domain needed) — the repo has a
-`render.yaml` Blueprint:
+**Web app on Netlify** (free, no credit card, no domain needed) — the repo has a
+`netlify.toml`:
 
-1. Push the repo to GitHub, then Render → **New → Blueprint** → pick the repo.
-2. Fill in the values Render prompts for (Supabase keys + secrets).
-3. Set `APP_ORIGIN` to the `https://<name>.onrender.com` URL it gives you.
+1. Push the repo to GitHub, then Netlify → **Add new site → Import an existing
+   project** → pick the repo.
+2. Add the env vars listed at the top of `netlify.toml` (Supabase keys +
+   secrets). Set `DATABASE_POOL_MAX=1`.
+3. Deploy, then set `APP_ORIGIN` to the `https://<site>.netlify.app` URL and
+   redeploy.
 
 **Worker** needs Firefox and a long-running process, so it goes on a VPS:
 
 ```bash
 cp .env.example .env
-# set WORKER_API_URL to the Render URL, plus the two shared secrets
+# set WORKER_API_URL to the Netlify URL, plus the two shared secrets
 docker compose up -d worker
 ```
 

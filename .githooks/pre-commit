@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+# ---------------------------------------------------------------------------
+# Refuse to commit real secrets.
+#
+# The most common mistake is pasting real values into `.env.example`, which is
+# tracked by git. Real values belong in `.env` (git-ignored).
+#
+# Installed with:  git config core.hooksPath .githooks
+# ---------------------------------------------------------------------------
+set -eu
+
+staged=$(git diff --cached --name-only)
+
+# Never commit any .env file except the template.
+bad_env=$(printf '%s\n' "$staged" | grep -E '(^|/)\.env($|\.)' | grep -vx '.env.example' || true)
+if [ -n "$bad_env" ]; then
+  echo "pre-commit: refusing to commit environment files:" >&2
+  printf '  %s\n' "$bad_env" >&2
+  echo "Use 'git rm --cached <file>' and keep values in .env (git-ignored)." >&2
+  exit 1
+fi
+
+printf '%s\n' "$staged" | grep -qx '.env.example' || exit 0
+
+added=$(git diff --cached -U0 -- .env.example | grep '^+' || true)
+if printf '%s\n' "$added" | grep -Eq 'sb_secret_[A-Za-z0-9_-]{10,}|sb_publishable_[A-Za-z0-9_-]{10,}|postgresql://[^<[:space:]]+:[^<[:space:]@]+@|CREDENTIALS_ENCRYPTION_KEY="[A-Za-z0-9+/=]{20,}"|WORKER_API_TOKEN="[a-f0-9]{32,}"'; then
+  echo "pre-commit: real secret values detected in .env.example" >&2
+  echo "Put them in .env instead, then restore the template:" >&2
+  echo "  git checkout -- .env.example" >&2
+  exit 1
+fi

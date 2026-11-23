@@ -11,6 +11,9 @@ dist-ssr
 .wrangler
 .output
 .vinxi
+# PaaS build output
+.netlify
+.vercel
 __unconfig*
 todos.json
 

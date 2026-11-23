@@ -34,11 +34,11 @@ You don't need Oracle. Anything that runs Docker will do:
 | **Liara** — <https://liara.ir> | Iranian PaaS | Accepts Iranian cards, Docker deploys, Iranian support. Good for the web app; check that your plan allows a *persistent* worker. |
 | **ArvanCloud** — <https://arvancloud.ir> | Iranian cloud | IaaS/PaaS; can run both containers. |
 | **Parspack / Iranserver / MihanWebHost** | Iranian VPS | Paid (rial), not free, but cheap and reliably reachable from Iran. Good home for the worker. |
-| **Koyeb** — <https://koyeb.com> | Global PaaS (FR) | Free instance, no credit card. Fine for the web app; usually too small for Firefox. |
-| **Render** — <https://render.com> | Global PaaS (US) | Free web service, no card. Web app only (free tier sleeps, no background workers). |
+| **Netlify** — <https://netlify.com> | Global PaaS (US) | Free plan, no card. Runs the web app as serverless functions + CDN. Worker can't run here. |
+| **Render** — <https://render.com> | Global PaaS (US) | New accounts now require a card. Web app only (free tier sleeps, no background workers). |
 | **Hugging Face Spaces** | Free Docker, 16 GB RAM | Can host the *worker* (Docker Space), but free Spaces sleep when idle. |
 
-**Recommended split (what this guide uses):** the **web app on Render** (free,
+**Recommended split (what this guide uses):** the **web app on Netlify** (free,
 no card, no domain needed) and the **worker on a VPS** — a European VPS reaches
 Instagram directly; an Iranian one needs `WORKER_DEFAULT_PROXY`.
 
@@ -71,42 +71,55 @@ Either way you need the free **Supabase** project from section 2 below.
 
 ---
 
-## 3. Deploy the web app on Render (no domain needed)
+## 3. Deploy the web app on Netlify (no card, no domain needed)
 
-Render gives you a free `https://<name>.onrender.com` URL, so you can start
-without owning a domain. The repo includes a `render.yaml` Blueprint.
+Netlify's free plan gives you `https://<site>.netlify.app` with HTTPS and does
+not require a credit card. The repo includes `netlify.toml`; Nitro writes the
+server function to `.netlify/v1/functions` and static assets to `dist`.
 
 1. Push the repo to GitHub.
-2. Render dashboard → **New → Blueprint** → connect the repo. Render reads
-   `render.yaml` and creates the `growly` web service.
-3. Render prompts for every value marked `sync: false`. Paste the Supabase keys,
-   `CREDENTIALS_ENCRYPTION_KEY`, `WORKER_API_TOKEN`, and `ADMIN_EMAILS`. You can
-   leave `APP_ORIGIN` blank for this first deploy.
-4. Deploy. When it finishes, copy the service URL from the top of the page,
-   e.g. `https://growly.onrender.com`.
-5. **Environment** tab → set `APP_ORIGIN` to that URL → save (it redeploys).
-   This enables the CSRF origin check.
+2. Netlify → **Add new site → Import an existing project** → GitHub → pick the
+   repo. Netlify reads `netlify.toml` (`npm run build`, publish `dist`, Node 22,
+   `NITRO_PRESET=netlify`).
+3. **Site configuration → Environment variables** → add:
+
+   | Variable | Value |
+   | --- | --- |
+   | `DATABASE_URL` | Supabase **transaction pooler** (port `6543`) |
+   | `VITE_SUPABASE_URL` | `https://<ref>.supabase.co` |
+   | `VITE_SUPABASE_ANON_KEY` | publishable / anon key |
+   | `SUPABASE_URL` | same as `VITE_SUPABASE_URL` |
+   | `SUPABASE_ANON_KEY` | same as `VITE_SUPABASE_ANON_KEY` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | secret / service_role key |
+   | `CREDENTIALS_ENCRYPTION_KEY` | shared with the worker |
+   | `WORKER_API_TOKEN` | shared with the worker |
+   | `ADMIN_EMAILS` | your signup email |
+   | `DATABASE_POOL_MAX` | `1` (serverless: one connection per invocation) |
+   | `APP_ORIGIN` | leave blank for the first deploy |
+
+4. Deploy. When it finishes, copy the site URL.
+5. **Environment variables** → set `APP_ORIGIN` to that URL → **Deploys → Trigger
+   deploy** (env changes need a redeploy).
 
 Notes:
 
-- The blueprint sets `NITRO_PRESET=render-com` and `HOST=0.0.0.0`, and pins Node
-  to 22 via `.node-version`.
-- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` must exist **at build time** —
-  Render passes env vars to the build, so just set them and redeploy after any
-  change (they are baked into the browser bundle).
-- The **worker does not run on Render** (the free tier has no background
-  workers and no Firefox). Host it on a VPS and point its `WORKER_API_URL` at
-  this URL — see the next section.
-- A free web service sleeps after ~15 min idle. The worker's ~20 s polling keeps
-  it warm (good for responsiveness), but keep an eye on your free
-  instance-hours.
-- Choose a Render region near your Supabase region (the blueprint uses
-  `frankfurt`) so DB round-trips stay short.
+- `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are baked into the browser
+  bundle **at build time**; changing them requires a redeploy.
+- The free plan has a monthly credit allowance and a ~10 s function timeout.
+  This app only does quick DB reads/writes per request — the long InstaPy work
+  happens on the worker — so it fits.
+- The **worker does not run on Netlify**. Host it on a VPS (next section).
+
+### Render (alternative, now requires a card)
+
+The repo also includes `render.yaml`. Render → **New → Blueprint** → pick the
+repo → fill the `sync: false` values → set `APP_ORIGIN` after the first deploy.
+Render's free web service sleeps after ~15 min idle.
 
 ## 4. Deploy the worker (and optionally the web app) on a VPS
 
 The worker needs Firefox and a long-running process, so it lives on a VPS. If
-the web app is on Render, you only need the **worker** container here;
+the web app is on Netlify, you only need the **worker** container here;
 otherwise the compose file runs both.
 
 ### Prepare the box
@@ -157,16 +170,16 @@ internally (already set in `docker-compose.yml`). Refresh the app after editing
 docker compose build web && docker compose up -d web
 ```
 
-### Web app on Render? Run the worker only
+### Web app on Netlify? Run the worker only
 
-If the web app lives on Render, point the worker at it and start just that
+If the web app lives on Netlify, point the worker at it and start just that
 container:
 
 ```bash
 # In .env:
-#   WORKER_API_URL="https://growly.onrender.com"
-#   WORKER_API_TOKEN="<same value as Render>"
-#   CREDENTIALS_ENCRYPTION_KEY="<same value as Render>"
+#   WORKER_API_URL="https://<your-site>.netlify.app"
+#   WORKER_API_TOKEN="<same value as Netlify>"
+#   CREDENTIALS_ENCRYPTION_KEY="<same value as Netlify>"
 
 docker compose up -d worker
 docker compose logs -f worker
