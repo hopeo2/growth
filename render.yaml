@@ -42,7 +42,9 @@ services:
       # Supabase Postgres (transaction pooler, port 6543)
       - key: DATABASE_URL
         sync: false
-      # Supabase Auth — VITE_* are baked into the browser bundle at build time
+      # Supabase Auth — VITE_* are baked into the browser bundle at build time.
+      # New Supabase projects: paste the "publishable" key (sb_publishable_...)
+      # into the *_ANON_KEY fields; it replaces the legacy anon key.
       - key: VITE_SUPABASE_URL
         sync: false
       - key: VITE_SUPABASE_ANON_KEY
@@ -51,6 +53,7 @@ services:
         sync: false
       - key: SUPABASE_ANON_KEY
         sync: false
+      # New projects: the "secret" key (sb_secret_...)
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
       # Secrets shared with the worker

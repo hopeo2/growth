@@ -29,10 +29,17 @@ export const serverEnv = {
 		return requiredAny(["SUPABASE_URL", "VITE_SUPABASE_URL"]);
 	},
 	get supabaseAnonKey() {
-		return requiredAny(["SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"]);
+		// "publishable" is the new name for the browser-safe (legacy "anon") key.
+		return requiredAny([
+			"SUPABASE_ANON_KEY",
+			"VITE_SUPABASE_ANON_KEY",
+			"SUPABASE_PUBLISHABLE_KEY",
+			"VITE_SUPABASE_PUBLISHABLE_KEY",
+		]);
 	},
 	get supabaseServiceRoleKey() {
-		return required("SUPABASE_SERVICE_ROLE_KEY");
+		// New projects expose this as a "secret" key: sb_secret_...
+		return requiredAny(["SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"]);
 	},
 	get encryptionKey() {
 		return required("CREDENTIALS_ENCRYPTION_KEY");

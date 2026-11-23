@@ -10,11 +10,15 @@ export function createSupabaseBrowserClient() {
 	if (browserClient) return browserClient;
 
 	const url = import.meta.env.VITE_SUPABASE_URL;
-	const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+	// Supabase's new key format calls the browser-safe key "publishable"; older
+	// projects call it the "anon" key. Accept either name.
+	const anonKey =
+		import.meta.env.VITE_SUPABASE_ANON_KEY ||
+		import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 	if (!url || !anonKey) {
 		throw new Error(
-			"VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set at build time.",
+			"Set VITE_SUPABASE_URL and either VITE_SUPABASE_ANON_KEY (legacy) or VITE_SUPABASE_PUBLISHABLE_KEY (new) at build time.",
 		);
 	}
 
