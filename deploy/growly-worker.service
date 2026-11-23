@@ -1,0 +1,35 @@
+# Growly automation worker (InstaPy + Firefox) under systemd.
+#
+# Install:
+#   sudo cp deploy/growly-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now growly-worker
+#   journalctl -u growly-worker -f
+#
+# Each unit runs one worker. To add more, copy the file, change
+# WORKER_NAME, and start it.
+
+[Unit]
+Description=Growly automation worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=growly
+Group=growly
+WorkingDirectory=/opt/growly
+EnvironmentFile=/opt/growly/.env
+Environment=WORKER_NAME=worker-1
+# Headless display; remove if you install Xvfb separately.
+Environment=DISPLAY=:99
+ExecStart=/opt/growly/.venv/bin/python -m worker
+Restart=always
+RestartSec=5
+
+# Firefox needs a writable home and /dev/shm.
+PrivateTmp=false
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

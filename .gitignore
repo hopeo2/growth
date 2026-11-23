@@ -1,0 +1,31 @@
+node_modules
+.DS_Store
+dist
+dist-ssr
+*.local
+.env
+.nitro
+.tanstack
+.wrangler
+.output
+.vinxi
+__unconfig*
+todos.json
+
+# Python / worker
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+worker/*.log
+
+# InstaPy runtime state (logs, sqlite db, session cookies)
+instapy-00/logs/
+instapy-00/db/
+instapy-00/*.log
+instapy-00/*.db
+# InstaPy's own venv + downloaded assets/workspace (huge, regenerated at runtime)
+instapy-00/venv/
+instapy-00/workspace/
+instapy-00/.venv/
+

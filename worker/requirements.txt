@@ -1,0 +1,16 @@
+# Growly automation worker dependencies.
+#
+# InstaPy's own runtime dependencies are listed in ../instapy-00/requirements.txt;
+# install those first (see worker/README.md), then this file.
+#
+#   pip install -r instapy-00/requirements.txt
+#   pip install -r worker/requirements.txt
+
+# HTTP client used to talk to /api/worker/*
+requests>=2.31
+
+# AES-256-GCM, matching the web app's crypto.server.ts
+cryptography>=42.0
+
+# Convenience: read the repo-root .env automatically
+python-dotenv>=1.0

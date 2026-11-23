@@ -1,0 +1,43 @@
+# Growly — one-command deployment on any Docker host.
+#
+#   cp .env.example .env      # fill in Supabase keys + secrets
+#   docker compose up -d --build
+#
+# This works on any free/cheap VPS or container platform: a plain Ubuntu box,
+# an Iranian host such as Liara, or a global PaaS. See DEPLOYMENT.md.
+#
+# The web app is exposed on :3000. Put Caddy/nginx (or the host's own TLS
+# proxy) in front of it. The worker talks to the web app over the internal
+# network and never needs a public port.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Baked into the browser bundle at build time.
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Public URL users type in the browser (used for CSRF origin checks).
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    env_file: .env
+    environment:
+      # Reach the web app: over the compose network when it runs here, or the
+      # Render URL when the web app is hosted there. Set WORKER_API_URL in .env
+      # to override, e.g. WORKER_API_URL=https://growly.onrender.com
+      WORKER_API_URL: ${WORKER_API_URL:-http://web:3000}
+      WORKER_HEADLESS: "true"
+    restart: unless-stopped

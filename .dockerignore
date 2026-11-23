@@ -1,0 +1,32 @@
+# Build context for the web image (`Dockerfile`).
+node_modules
+.output
+.nitro
+.tanstack
+dist
+dist-ssr
+.vinxi
+.wrangler
+
+# Local secrets & editor noise
+.env
+.env.*
+!.env.example
+.git
+.gitignore
+.vscode
+.DS_Store
+
+# Python / worker artifacts we don't want in the web image
+.venv
+venv
+**/__pycache__
+**/*.pyc
+worker/*.log
+instapy-00/logs
+instapy-00/db
+instapy-00/*.log
+instapy-00/*.db
+instapy-00/venv
+instapy-00/workspace
+instapy-00/__pycache__

@@ -1,0 +1,37 @@
+# Growly web app (TanStack Start / Nitro node-server) under systemd.
+#
+# Install:
+#   sudo cp deploy/growly-web.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now growly-web
+#
+# Adjust User/Group/WorkingDirectory/ExecStart to match your checkout.
+
+[Unit]
+Description=Growly web app
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=growly
+Group=growly
+WorkingDirectory=/opt/growly
+# Reads DATABASE_URL, SUPABASE_*, CREDENTIALS_ENCRYPTION_KEY, WORKER_API_TOKEN,
+# APP_ORIGIN, PORT, ADMIN_EMAILS. Lock the file down: chmod 600 .env
+EnvironmentFile=/opt/growly/.env
+# Node is installed system-wide; swap for your nvm path if needed.
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/node .output/server/index.mjs
+Restart=always
+RestartSec=3
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
