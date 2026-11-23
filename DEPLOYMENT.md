@@ -170,23 +170,50 @@ internally (already set in `docker-compose.yml`). Refresh the app after editing
 docker compose build web && docker compose up -d web
 ```
 
-### Web app on Netlify? Run the worker only
+### Web app on Netlify? Run the worker only (recommended)
 
-If the web app lives on Netlify, point the worker at it and start just that
-container:
+The worker only makes **outbound** calls, so this box needs no open ports beyond
+SSH. On a fresh Ubuntu 24.04 VPS:
 
 ```bash
-# In .env:
-#   WORKER_API_URL="https://<your-site>.netlify.app"
-#   WORKER_API_TOKEN="<same value as Netlify>"
-#   CREDENTIALS_ENCRYPTION_KEY="<same value as Netlify>"
+# 1. Code + Docker + swap + firewall
+git clone https://github.com/hopeo2/growth.git growth
+cd growth
+sudo bash deploy/bootstrap-vps.sh
 
-docker compose up -d worker
+# 2. Worker config — no Supabase keys, no DATABASE_URL needed here
+cp deploy/worker.env.example .env
+nano .env
+```
+
+The `.env` needs three values from the web app's host (Netlify → **Site
+configuration → Environment variables**):
+
+```dotenv
+WORKER_API_URL="https://growth00.netlify.app"   # your web app URL
+WORKER_API_TOKEN="<same 64-hex value as the web app>"
+CREDENTIALS_ENCRYPTION_KEY="<same 44-char base64 value as the web app>"
+WORKER_POLL_SECONDS="60"                        # keeps Netlify invocations low
+```
+
+```bash
+# 3. Build and start
+docker compose up -d --build worker
 docker compose logs -f worker
 ```
 
+A healthy start logs `Worker 'worker-1' v0.1.0 starting against ...` followed by
+heartbeats. Confirm in the web app: **Admin → Workers** lists the worker as
+online.
+
 Only `WORKER_API_TOKEN` and `CREDENTIALS_ENCRYPTION_KEY` must match the web app;
-the worker doesn't need the Supabase keys or `DATABASE_URL`.
+the worker never talks to Postgres directly.
+
+> **Reaching Instagram.** A European VPS (this Austria box) usually reaches
+> Instagram, but shared datacenter IPs are sometimes rate-limited. If runs fail
+> with `checkpoint_required` or a login challenge, set `WORKER_DEFAULT_PROXY` to
+> an HTTP(S) proxy — a residential/mobile proxy in the account's country works
+> best. InstaPy does **not** support SOCKS proxies.
 
 ### Concurrency / resources
 
