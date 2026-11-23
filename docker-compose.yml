@@ -19,6 +19,8 @@ services:
         # Baked into the browser bundle at build time.
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        # New Supabase projects call the same key "publishable".
+        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY:-}
     env_file: .env
     environment:
       NODE_ENV: production

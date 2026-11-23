@@ -49,11 +49,14 @@ Either way you need the free **Supabase** project from section 2 below.
 ## 2. Supabase
 
 1. Create a project at <https://supabase.com> (free plan).
-2. **Settings → Database** → copy the connection string. Use the
-   **connection pooler** (`...pooler.supabase.com:6543`) for the app, and the
-   direct connection (`:5432`) for `drizzle-kit` if the pooler rejects DDL.
-3. **Settings → API** → copy the project URL, the `anon` key, and the
-   `service_role` key.
+2. **Connect → Direct** (or **Settings → Database**) → copy the connection
+   string. Use the **transaction pooler** (`...pooler.supabase.com:6543`) for
+   the app at runtime, and the **session pooler** (`:5432`) for `drizzle-kit`.
+   New projects expose the "Direct" connection over IPv6 only, so the session
+   pooler (IPv4) is the safe choice for migrations.
+3. **Connect → Framework → React/Vite** → copy the project URL and the
+   **publishable** key (this replaced the old `anon` key). The **secret** key
+   (old `service_role`) is under **Settings → API Keys**.
 4. Apply the schema from your machine:
 
    ```bash
