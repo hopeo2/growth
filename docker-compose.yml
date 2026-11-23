@@ -30,6 +30,11 @@ services:
     ports:
       - "3000:3000"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   worker:
     build:
@@ -38,8 +43,15 @@ services:
     env_file: .env
     environment:
       # Reach the web app: over the compose network when it runs here, or the
-      # Render URL when the web app is hosted there. Set WORKER_API_URL in .env
-      # to override, e.g. WORKER_API_URL=https://growly.onrender.com
+      # public URL when the web app is on Netlify/Render. Set WORKER_API_URL in
+      # .env, e.g. WORKER_API_URL=https://growth00.netlify.app
       WORKER_API_URL: ${WORKER_API_URL:-http://web:3000}
       WORKER_HEADLESS: "true"
+    # Firefox needs more than the default 64 MB of /dev/shm.
+    shm_size: "1gb"
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
