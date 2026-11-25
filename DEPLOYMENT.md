@@ -35,6 +35,7 @@ You don't need Oracle. Anything that runs Docker will do:
 | **ArvanCloud** — <https://arvancloud.ir> | Iranian cloud | IaaS/PaaS; can run both containers. |
 | **Parspack / Iranserver / MihanWebHost** | Iranian VPS | Paid (rial), not free, but cheap and reliably reachable from Iran. Good home for the worker. |
 | **Netlify** — <https://netlify.com> | Global PaaS (US) | Free plan, no card. Runs the web app as serverless functions + CDN. Worker can't run here. |
+| **Altare** — <https://altare.gg> | Global PaaS | Free sandboxes (root SSH, Debian/Ubuntu, EU regions). **No Docker and no systemd**, so the worker is installed natively — see §4b. |
 | **Render** — <https://render.com> | Global PaaS (US) | New accounts now require a card. Web app only (free tier sleeps, no background workers). |
 | **Hugging Face Spaces** | Free Docker, 16 GB RAM | Can host the *worker* (Docker Space), but free Spaces sleep when idle. |
 
@@ -240,6 +241,61 @@ docker build -f Dockerfile.worker \
 ```
 
 ---
+
+## 4b. Worker on an Altare sandbox (no Docker)
+
+[Altare](https://altare.gg) gives every team an *Always Free* pool of memory,
+CPU and disk, plus sandboxes you reach over SSH as root. Its free EU regions
+(Frankfurt, Karlskrona/Stockholm, Helsinki, London) can reach Instagram
+directly.
+
+Sandboxes have **no Docker and no systemd**: install with `apt`, run processes
+under `nohup`/`tmux`, and start them again after a restart.
+
+In the console → **Apps → New app**:
+
+| Field | Value |
+| --- | --- |
+| Software | **Sandboxes → Debian 12** |
+| Region | Frankfurt, Stockholm, Helsinki or London |
+| SSH access | a team SSH key, or a password (10+ chars) |
+| Name | `growly-worker` |
+| Memory / CPU / Disk | 2 GiB / 100% / as offered |
+
+> **Why Debian 12?** It ships Python 3.11 and `firefox-esr` from `apt` — the same
+> combination as the tested `Dockerfile.worker` image. Ubuntu 24.04 ships
+> Firefox as a snap (which needs systemd), so its install differs; the script
+> below handles either, but Debian is smoother.
+
+Then, over SSH (or the browser shell in the console):
+
+```bash
+apt-get update && apt-get install -y git
+git clone https://github.com/hopeo2/growth.git /root/growth
+cd /root/growth
+bash deploy/altare-sandbox.sh   # Firefox ESR, geckodriver, venv, Python deps
+cp deploy/worker.env.example .env
+nano .env                       # WORKER_API_URL + the two shared secrets
+bash deploy/altare-start-worker.sh
+tail -f /root/logs/worker.log
+```
+
+Set in `.env`:
+
+```dotenv
+WORKER_API_URL="https://growth00.netlify.app"
+WORKER_API_TOKEN="<same as the web app>"
+CREDENTIALS_ENCRYPTION_KEY="<same as the web app>"
+WORKER_POLL_SECONDS="60"
+```
+
+Keep **Pause when idle** off (Settings → General), or Altare stops the sandbox
+after a quiet spell. There is no auto-start, so after any restart run
+`bash deploy/altare-start-worker.sh` again.
+
+`deploy/altare-sandbox.sh` installs `firefox-esr` (or Mozilla's `.deb` on
+Ubuntu), geckodriver 0.35, a `.venv` with both requirements files, and writes
+`deploy/altare-start-worker.sh`.
 
 ## 5. Deploy without Docker (systemd on a VPS)
 
