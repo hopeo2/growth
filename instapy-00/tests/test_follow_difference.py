@@ -115,3 +115,87 @@ def test_follow_difference_limit_defaults_to_300():
 
     session.set_follow_difference_limit(enabled=False)
     assert session.max_follow_difference is None
+
+
+def _bare_session():
+    session = InstaPy.__new__(InstaPy)
+    session.browser = None
+    session.username = "tester"
+    session.ignore_users = []
+    session.blacklist = {}
+    session.potency_ratio = None
+    session.delimit_by_numbers = None
+    session.max_followers = None
+    session.max_following = None
+    session.min_followers = None
+    session.min_following = None
+    session.min_posts = None
+    session.max_posts = None
+    session.skip_private = False
+    session.skip_private_percentage = 0
+    session.skip_public = False
+    session.skip_public_percentage = 0
+    session.skip_no_profile_pic = False
+    session.skip_no_profile_pic_percentage = 0
+    session.skip_business = False
+    session.skip_non_business = False
+    session.skip_business_percentage = 0
+    session.skip_business_categories = []
+    session.dont_skip_business_categories = []
+    session.skip_bio_keyword = []
+    session.mandatory_bio_keywords = []
+    session.logger = _Logger()
+    session.logfolder = "."
+    session.max_follow_difference = None
+    return session
+
+
+def _session_for_follow_check(monkeypatch, counts, limit):
+    session = _bare_session()
+    session.max_follow_difference = limit
+    monkeypatch.setattr(
+        "instapy.instapy.get_relationship_counts",
+        lambda browser, username, logger: counts,
+    )
+    return session
+
+
+def test_follow_check_allows_close_counts(monkeypatch):
+    session = _session_for_follow_check(monkeypatch, (1000, 800), 300)
+    assert session.follow_difference_ok("target") is True
+
+
+def test_follow_check_blocks_lopsided_counts(monkeypatch):
+    session = _session_for_follow_check(monkeypatch, (1000, 100), 300)
+    assert session.follow_difference_ok("target") is False
+
+
+def test_follow_check_returns_true_when_disabled(monkeypatch):
+    session = _session_for_follow_check(monkeypatch, (1000, 1), None)
+    assert session.follow_difference_ok("target") is True
+
+
+def test_follow_check_returns_true_for_unknown_counts(monkeypatch):
+    session = _session_for_follow_check(monkeypatch, (None, None), 300)
+    assert session.follow_difference_ok("target") is True
+
+
+def test_validate_user_call_can_skip_difference(monkeypatch):
+    captured = {}
+
+    def fake_validate_username(*args, **kwargs):
+        captured["max_follow_difference"] = args[-1]
+        return True, "ok"
+
+    monkeypatch.setattr(
+        "instapy.instapy.validate_username", fake_validate_username
+    )
+
+    session = _bare_session()
+    session.max_follow_difference = 300
+
+    session.validate_user_call("target")
+    assert captured["max_follow_difference"] == 300
+
+    session.validate_user_call("target", check_follow_difference=False)
+    assert captured["max_follow_difference"] is None

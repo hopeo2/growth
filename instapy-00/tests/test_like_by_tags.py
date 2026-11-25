@@ -61,6 +61,7 @@ def _make_session():
     session.do_follow = False
     session.follow_percentage = 0
     session.follow_times = 1
+    session.max_follow_difference = None
 
     session.liked_img = 0
     session.already_liked = 0
@@ -91,7 +92,7 @@ def patched(monkeypatch):
             return True, "old_user", False, "Post is too old", "Inactive account"
         return False, "fresh_user", False, "None", "Success"
 
-    def fake_validate_user_call(user_name):
+    def fake_validate_user_call(user_name, **kwargs):
         return True, "valid"
 
     def fake_like_image(*args, **kwargs):
@@ -105,7 +106,9 @@ def patched(monkeypatch):
         "instapy.instapy.web_address_navigator", lambda *a, **k: None
     )
     monkeypatch.setattr(
-        InstaPy, "validate_user_call", lambda self, user: fake_validate_user_call(user)
+        InstaPy,
+        "validate_user_call",
+        lambda self, user, **kwargs: fake_validate_user_call(user),
     )
     monkeypatch.setattr("instapy.instapy.like_image", fake_like_image)
 

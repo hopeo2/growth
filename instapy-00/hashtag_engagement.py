@@ -9,8 +9,8 @@ Safety features (enabled by default):
   * a cooldown between runs,
   * a lock that prevents two runs from using the same account at once,
   * a hard time limit for each run,
-  * a follow filter that skips accounts whose follower and following counts
-    differ by more than 300,
+  * a follow filter that only follows accounts whose follower and following
+    counts differ by at most 5000 (it never blocks likes or comments),
   * unfollows accounts that have not followed back within 3 days and keeps
     them on a permanent "do not follow" list,
   * a check of today's recorded usage before and during the run.
@@ -73,65 +73,69 @@ from instapy.unfollow_util import follow_restriction
 # ---------------------------------------------------------------------------
 
 DEFAULT_HASHTAGS = [
-    "فالو",
-    "فالوبک",
+    "فالو_متقابل",
+    "حمایت_متقابل",
+    "تبادل_فالو",
+    "تبادل_لایک",
+    "تبادل_کامنت",
     "فالو_بک",
-    "فالوور",
-    "فالوور_واقعی",
+    "فالوبک",
+    "لایک_متقابل",
+    "کامنت_متقابل",
+    "حمایت_واقعی",
+    "معرفی_پیج",
+    "لایک_فالو",
+    "تبادل",
+    "حمایت",
     "فالو_کن",
     "فالو_میکنم",
     "فالو_میشی",
-    "فالو_دوطرفه",
-    "فالو_متقابل",
+    "فالو",
     "لایک",
-    "لایک_متقابل",
     "کامنت",
-    "کامنت_متقابل",
-    "تعامل",
-    "تعامل_پیج",
-    "حمایت",
-    "حمایت_متقابل",
-    "دوستی",
-    "همکاری",
-    "افزایش_فالوور",
-    "افزایش_پیج",
+    "رشد_اینستاگرام",
+    "حمایت_از_مشاغل_خانگی",
 ]
 
 DEFAULT_COMMENTS = [
     "عالی بود 👌",
     "چقدر قشنگ ❤️",
-    "بی‌نظیر 🔥",
-    "دمت گرم",
+    "بینظیر 🔥",
+    "دمت گرم 👏",
     "واقعاً جذاب بود",
-    "چه سلیقه‌ای 😍",
-    "محشره",
-    "حرف نداشت",
-    "همیشه بدرخشی",
-    "خیلی خفن بود",
-    "این یکی متفاوت بود",
-    "چقدر دوست‌داشتنی",
-    "عالی مثل همیشه",
-    "فوق‌العاده 👏",
-    "پر از حس خوب",
-    "ترکوندی 😂",
-    "واقعاً دیدنی بود",
-    "چه عکس قشنگی",
-    "سلیقه یعنی این",
-    "منتظر پست بعدی هستیم",
-    "چقدر حرفه‌ای",
-    "این خیلی جالب بود",
+    "چه سلیقهای 😍",
+    "محشره 👌",
+    "حرف نداشت 🔥",
+    "همیشه بدرخشی 🌟",
+    "خیلی خفن بود 👏",
+    "این یکی متفاوت بود ✨",
+    "چقدر دوستداشتنی ❤️",
+    "عالی مثل همیشه 👌",
+    "فوقالعاده 👏",
+    "پر از حس خوب 🌷",
+    "ترکوندی 😍",
+    "واقعاً دیدنی بود ✨",
+    "چه عکس قشنگی 📸",
+    "سلیقه یعنی این 😍",
+    "منتظر پست بعدی هستیم ⏳",
+    "چقدر حرفهای 👏",
+    "این خیلی جالب بود ✨",
     "بهترین 👌",
-    "در یک کلام عالی",
-    "چه انرژی خوبی",
-    "واقعاً تحسین‌برانگیزه",
-    "ممنون بابت اشتراک‌گذاری",
-    "این پست ارزش دیدن داشت",
-    "همین‌طور ادامه بده",
-    "پایدار و موفق باشی ❤️",
-    "فالو کردم، خوشحال میشم حمایت کنی ❤️",
+    "در یک کلام عالی ❤️",
+    "چه انرژی خوبی 🌞",
+    "واقعاً تحسینبرانگیزه 👏",
+    "ممنون بابت اشتراکگذاری 🙏",
+    "این پست ارزش دیدن داشت ❤️",
+    "همینطور ادامه بده 💪",
+    "پایدار و موفق باشی 🌟",
+    "پیج پر از انرژی و انگیزه 💚",
+    "محتوات واقعاً ارزش دیدن داره 👌",
+    "چه محتوای دلنشینی ❤️",
+    "موفق باشی و پررونق 🌷",
+    "فالو کردم، خوشحال میشم متقابل حمایت کنی ❤️",
     "فالو دوطرفه؟ 🌹",
     "من حمایت کردم، نوبت شماست 😍",
-    "پایه حمایت متقابل هستی؟",
+    "پایه حمایت متقابل هستی؟ 🤝",
     "فالو بک یادت نره ❤️",
     "بیایید از هم حمایت کنیم 🤝",
     "حمایت کنیم تا همه رشد کنیم 🌱",
@@ -142,7 +146,12 @@ DEFAULT_COMMENTS = [
 
 STATE_FILENAME = "engagement_state.json"
 LOCK_FILENAME = "engagement.lock"
-MAX_FOLLOW_DIFFERENCE = 300
+# The follower/following difference limit only decides whether an account is
+# followed; likes and comments are never limited by it. Persian
+# follow-for-follow communities are full of accounts with a lopsided ratio,
+# and a 300 difference blocked almost every action, so the default is now much
+# more permissive (set it to 0 to disable the follow check entirely).
+DEFAULT_MAX_FOLLOW_DIFFERENCE = 5000
 DEFAULT_UNFOLLOW_AFTER_DAYS = 3
 
 
@@ -175,10 +184,10 @@ def parse_args():
     parser.add_argument(
         "--candidates-per-hashtag",
         type=int,
-        default=3,
+        default=5,
         help=(
             "candidate posts to inspect per hashtag so stale or unavailable "
-            "posts do not waste the hashtag (default: 3)"
+            "posts do not waste the hashtag (default: 5)"
         ),
     )
     parser.add_argument(
@@ -194,6 +203,18 @@ def parse_args():
         type=int,
         default=80,
         help="percentage of processed posts whose author is followed (default: 80)",
+    )
+    parser.add_argument(
+        "--max-follow-difference",
+        type=int,
+        default=DEFAULT_MAX_FOLLOW_DIFFERENCE,
+        help=(
+            "only follow accounts whose follower and following counts differ "
+            "by at most this amount; likes and comments are never limited by "
+            "it (default: {}; 0 disables the follow check)".format(
+                DEFAULT_MAX_FOLLOW_DIFFERENCE
+            )
+        ),
     )
     parser.add_argument(
         "--comment-percentage",
@@ -563,10 +584,14 @@ def print_summary(hashtags, comments, args):
             clamp_percentage(args.comment_percentage),
         )
     )
-    print(
-        "Follow filter: only accounts whose follower and following counts "
-        "differ by at most {}.".format(MAX_FOLLOW_DIFFERENCE)
-    )
+    if args.max_follow_difference > 0:
+        print(
+            "Follow filter: only follows accounts whose follower and "
+            "following counts differ by at most {} (likes and comments are "
+            "never limited by it).".format(args.max_follow_difference)
+        )
+    else:
+        print("Follow filter: disabled (follows are not ratio-checked).")
     if args.unfollow_after_days:
         print(
             "Unfollow check: accounts that have not followed back within "
@@ -676,6 +701,8 @@ def validate_args(args):
         sys.exit("--max-run-minutes must be at least 1.")
     if args.max_post_age_days < 0:
         sys.exit("--max-post-age-days cannot be negative (use 0 to disable).")
+    if args.max_follow_difference < 0:
+        sys.exit("--max-follow-difference cannot be negative (use 0 to disable).")
     if args.unfollow_after_days < 0:
         sys.exit("--unfollow-after-days cannot be negative (use 0 to disable).")
     if args.min_hours_between_runs < 0:
@@ -795,10 +822,14 @@ def run_session(
         session.set_skip_users(skip_private=False)
 
         # Only follow accounts whose follower and following counts are close
-        # enough that a follow-back is plausible.
-        session.set_follow_difference_limit(
-            max_difference=MAX_FOLLOW_DIFFERENCE
-        )
+        # enough that a follow-back is plausible. This is a follow-only filter:
+        # posts from other accounts are still liked and commented on.
+        if args.max_follow_difference > 0:
+            session.set_follow_difference_limit(
+                max_difference=args.max_follow_difference
+            )
+        else:
+            session.set_follow_difference_limit(enabled=False)
 
         session.set_do_follow(
             enabled=True,

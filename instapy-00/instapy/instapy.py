@@ -96,6 +96,7 @@ from .util import (
     get_active_users,
     get_bounding_box,
     get_cord_location,
+    get_relationship_counts,
     highlight_print,
     interruption_handler,
     parse_cli_args,
@@ -1377,8 +1378,15 @@ class InstaPy:
 
         self.max_follow_difference = max_difference if enabled is True else None
 
-    def validate_user_call(self, user_name: str):
-        """Short call of validate_username() function"""
+    def validate_user_call(
+        self, user_name: str, check_follow_difference: bool = True
+    ):
+        """Short call of validate_username() function.
+
+        ``check_follow_difference=False`` runs all the usual checks but leaves
+        the follower/following difference out of them, so it can be applied to
+        the follow decision only (see ``follow_difference_ok``).
+        """
         validation, details = validate_username(
             self.browser,
             user_name,
@@ -1408,9 +1416,51 @@ class InstaPy:
             self.mandatory_bio_keywords,
             self.logger,
             self.logfolder,
-            self.max_follow_difference,
+            self.max_follow_difference if check_follow_difference else None,
         )
         return validation, details
+
+    def follow_difference_ok(self, user_name: str) -> bool:
+        """Return True when a user's follower/following counts are close
+        enough to make a follow-back plausible.
+
+        The follower/following difference limit is meant to keep *follows*
+        focused, so unlike ``validate_user_call`` this never blocks likes or
+        comments. It returns True when the check is disabled or the counts
+        cannot be read.
+        """
+        if self.max_follow_difference is None:
+            return True
+
+        followers_count, following_count = get_relationship_counts(
+            self.browser, user_name, self.logger
+        )
+        if followers_count is None or following_count is None:
+            self.logger.info(
+                "Couldn't verify the follower/following difference of "
+                "'{}'  ~skipping difference check".format(user_name)
+            )
+            return True
+
+        difference = abs(followers_count - following_count)
+        self.logger.info(
+            "User: '{}'  |> followers: {}  |> following: {}  |> difference: "
+            "{}".format(
+                user_name, followers_count, following_count, difference
+            )
+        )
+
+        if difference > self.max_follow_difference:
+            self.logger.info(
+                "'{}' has a follower/following difference of {} which exceeds "
+                "the maximum limit of {}  ~skipping follow\n".format(
+                    user_name, difference, self.max_follow_difference
+                )
+            )
+            return False
+
+        return True
+
 
     def fetch_smart_comments(self, is_video: bool, temp_comments: list):
         if temp_comments:
@@ -2085,8 +2135,15 @@ class InstaPy:
                         continue
 
                     if self.liking_approved:
-                        # validate user
-                        validation, details = self.validate_user_call(user_name)
+                        # Validate the user without letting the follower /
+                        # following difference filter block the like or the
+                        # comment. The difference limit is only a follow
+                        # filter (see `follow_difference_ok` below), so posts
+                        # from accounts with a lopsided ratio still get liked
+                        # and commented.
+                        validation, details = self.validate_user_call(
+                            user_name, check_follow_difference=False
+                        )
                         if validation is not True:
                             self.logger.info(details)
                             not_valid_users += 1
@@ -2178,6 +2235,7 @@ class InstaPy:
                                 and not follow_restriction(
                                     "read", user_name, self.follow_times, self.logger
                                 )
+                                and self.follow_difference_ok(user_name)
                             ):
 
                                 follow_state, msg = follow_user(

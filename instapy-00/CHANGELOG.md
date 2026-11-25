@@ -17,6 +17,16 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 
 ### Fixed
 
+- The follower/following difference filter no longer blocks likes and comments.
+  It is now applied only to the follow decision, so posts from accounts with a
+  lopsided ratio are still liked and commented on. This fixes the very low
+  activity on Persian follow-for-follow hashtags, where a `300` difference
+  skipped almost every account before any action.
+- `hashtag_engagement.py` now defaults to a permissive `5000` difference and
+  exposes it as `--max-follow-difference` (`0` disables the follow check).
+- `hashtag_engagement.py` ships a refreshed set of mutual-support hashtags and
+  more varied Persian comments, and inspects up to `5` candidate posts per
+  hashtag (was `3`) so a stale top post no longer wastes the whole hashtag.
 - Replaced the removed `window._sharedData` GraphQL scraping in
   `relationship_tools` with Instagram's web API so follower/following checks
   (and the unfollow step) work again. Unfollowing also no longer aborts when

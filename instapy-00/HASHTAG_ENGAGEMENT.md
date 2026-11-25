@@ -20,9 +20,9 @@ It uses the existing InstaPy package in this folder.
 | Protection | Default |
 | --- | --- |
 | Posts processed per hashtag | `1` |
-| Candidate posts inspected per hashtag | `3` |
+| Candidate posts inspected per hashtag | `5` |
 | Follow rate | `80%` of processed posts |
-| Follow filter | follower/following counts differ by at most `300` |
+| Follow filter | follower/following counts differ by at most `5000` (follows only; likes and comments are never limited by it) |
 | Comment rate | `50%` of processed posts |
 | Like cap | `25/hour`, `80/day` |
 | Comment cap | `5/hour`, `15/day` |
@@ -136,15 +136,32 @@ If any daily cap is already reached, the script refuses to start.
 
 ## Follow filter and unfollows
 
-Before following an author, the script compares the account's follower and
-following counts. If they differ by more than `300`, the author is skipped.
-This keeps follows focused on accounts where a follow-back is plausible.
+The follower/following difference filter is applied to the **follow decision
+only**. Before following an author, the script compares the account's follower
+and following counts. If they differ by more than `--max-follow-difference`
+(default `5000`), the author is not followed, but the post is still liked and
+commented on. This keeps follows focused on accounts where a follow-back is
+plausible without starving likes and comments.
+
+> Earlier versions applied this filter to the whole post, so an account with a
+> lopsided ratio was skipped entirely. Persian follow-for-follow hashtags are
+> full of such accounts, which is why almost no like, comment or follow was
+> performed. The filter can no longer block likes or comments.
 
 At the start of each run the script also unfollows accounts it followed that
 have not followed back within `3` days. Unfollowed accounts are written to
 InstaPy's persistent follow-restriction table, so they are never followed again.
 
 ```bash
+# default: follow when the difference is at most 5000
+venv/bin/python hashtag_engagement.py
+
+# stricter follow filter
+venv/bin/python hashtag_engagement.py --max-follow-difference 1000
+
+# ignore the follower/following ratio entirely for follows as well
+venv/bin/python hashtag_engagement.py --max-follow-difference 0
+
 # default: unfollow after 3 days
 venv/bin/python hashtag_engagement.py
 
@@ -182,7 +199,7 @@ bot inspects the next candidate for the same hashtag instead of giving up.
 
 Because the hashtag grids are usually ranked by engagement, many of the first
 results can be old. The bot therefore inspects up to
-`--candidates-per-hashtag` posts (default `3`) per hashtag until it handled the
+`--candidates-per-hashtag` posts (default `5`) per hashtag until it handled the
 requested `--amount` posts. This keeps a single stale post from wasting an
 entire hashtag.
 
@@ -211,10 +228,11 @@ venv/bin/python hashtag_engagement.py \
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--amount N` | `1` | Posts to process per hashtag |
-| `--candidates-per-hashtag N` | `3` | Candidate posts inspected per hashtag until `--amount` posts are handled |
+| `--candidates-per-hashtag N` | `5` | Candidate posts inspected per hashtag until `--amount` posts are handled |
 | `--tags-file FILE` | built-in list | One hashtag per line; replaces the built-in hashtags |
 | `--comments-file FILE` | built-in list | One comment per line; replaces the built-in comments |
 | `--follow-percentage N` | `80` | Percentage of processed posts whose author is followed |
+| `--max-follow-difference N` | `5000` | Only follow accounts whose follower and following counts differ by at most N; likes and comments are never limited by it (`0` disables) |
 | `--comment-percentage N` | `50` | Percentage of processed posts that receive a comment |
 | `--max-likes-hourly N` | `25` | Hourly like cap |
 | `--max-likes-daily N` | `80` | Daily like cap |
