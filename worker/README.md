@@ -88,15 +88,12 @@ python -m worker
 Start one process per `WORKER_NAME`. Multiple workers are safe: claim uses
 `SELECT … FOR UPDATE SKIP LOCKED`, so no two workers get the same job.
 
-### As a systemd service
+### Keeping it running
 
-See `deploy/growly-worker.service`:
+Run it under `tmux`, `screen`, `nohup`, or your own process manager:
 
 ```bash
-sudo cp deploy/growly-worker.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now growly-worker
-journalctl -u growly-worker -f
+nohup python -m worker > worker.log 2>&1 &
 ```
 
 ## How a run works

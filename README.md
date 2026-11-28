@@ -20,9 +20,6 @@ Three parts:
 - **Queue**: the Postgres `jobs` table using `SELECT … FOR UPDATE SKIP LOCKED` — no Redis, no cron
 - **Worker**: Python + [InstaPy](https://github.com/InstaPy/InstaPy) in headless Firefox
 
-Deploy target: **Supabase free tier + any Docker host** (an Iranian cloud such
-as Liara, a cheap VPS, or a global PaaS). See [`DEPLOYMENT.md`](./DEPLOYMENT.md).
-
 ## How it fits together
 
 ```
@@ -51,11 +48,8 @@ src/
   components/    UI primitives, charts, app shell
 worker/          Python InstaPy worker (see worker/README.md)
 supabase/        Auth linkage, trigger, RLS, seed (see supabase/README.md)
-deploy/          systemd units, Caddyfile, VPS bootstrap script
 instapy-00/      vendored InstaPy checkout
-Dockerfile       web app image        Dockerfile.worker  worker image
-docker-compose.yml  web + worker      netlify.toml       Netlify web app
-render.yaml      Render alternative   .githooks/         secret-scan pre-commit
+.githooks/       secret-scan pre-commit
 ```
 
 ## Quickstart (local)
@@ -79,36 +73,6 @@ python -m worker
 
 Sign up, then add an account under **Accounts**. Emails listed in `ADMIN_EMAILS`
 are promoted to admin on first login.
-
-## Deploy
-
-**Web app on Netlify** (free, no credit card, no domain needed) — the repo has a
-`netlify.toml`:
-
-1. Push the repo to GitHub, then Netlify → **Add new site → Import an existing
-   project** → pick the repo.
-2. Add the env vars listed at the top of `netlify.toml` (Supabase keys +
-   secrets). Set `DATABASE_POOL_MAX=1`.
-3. Deploy, then set `APP_ORIGIN` to the `https://<site>.netlify.app` URL and
-   redeploy.
-
-**Worker** needs Firefox and a long-running process, so it goes on a VPS:
-
-```bash
-cp .env.example .env
-# set WORKER_API_URL to the Netlify URL, plus the two shared secrets
-docker compose up -d worker
-```
-
-Or run the whole stack on one Docker host instead:
-
-```bash
-cp .env.example .env
-docker compose up -d --build   # web on :3000 + worker
-```
-
-Full walkthrough (including the Iran/Instagram proxy requirement) is in
-[`DEPLOYMENT.md`](./DEPLOYMENT.md).
 
 ## Scripts
 
@@ -139,7 +103,6 @@ All variables are documented in [`.env.example`](./.env.example). The essentials
 
 ## Documentation
 
-- [`DEPLOYMENT.md`](./DEPLOYMENT.md) — Supabase + Oracle Cloud walkthrough
 - [`worker/README.md`](./worker/README.md) — the automation worker
 - [`supabase/README.md`](./supabase/README.md) — schema, trigger, RLS
 
