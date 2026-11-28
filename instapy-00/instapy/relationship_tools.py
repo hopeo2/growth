@@ -62,8 +62,12 @@ def _api_headers(csrftoken):
         "User-Agent": Settings.user_agent,
         "Accept": "*/*",
         "X-IG-App-ID": _IG_WEB_APP_ID,
+        # The web app always sends these; without them Instagram can answer
+        # with an HTML login/challenge page instead of JSON.
+        "X-IG-WWW-Claim": "0",
         "X-Requested-With": "XMLHttpRequest",
         "Referer": "https://www.instagram.com/",
+        "Origin": "https://www.instagram.com",
     }
     if csrftoken:
         headers["X-CSRFToken"] = csrftoken
@@ -164,6 +168,124 @@ def _resolve_user_id(browser, username, self_username, user_info, logger):
     return None
 
 
+def _api_failure_detail(response):
+    """Return a short, safe description of an unusable API response."""
+    status = getattr(response, "status_code", "?")
+    headers = getattr(response, "headers", None) or {}
+    try:
+        content_type = headers.get("Content-Type", "unknown")
+    except AttributeError:
+        content_type = "unknown"
+
+    text = getattr(response, "text", None)
+    snippet = ""
+    if isinstance(text, str):
+        snippet = text.strip().replace("\n", " ")[:160]
+
+    return "HTTP {}  |  content-type: {}  |  body: {!r}".format(
+        status, content_type, snippet
+    )
+
+
+def _get_relationship_page_in_browser(
+    browser, user_id, relationship, max_id, logger
+):
+    """Fetch one page of relationship data from inside the logged-in page.
+
+    Instagram sometimes answers the private API with an HTML login or
+    challenge page even though the browser itself is still signed in. Running
+    the very same request in the page makes the browser attach its own
+    cookies, user agent and headers, which keeps the request valid where the
+    copied ``requests`` session is not.
+    """
+    endpoint = "/api/v1/friendships/{}/{}/?count=50".format(user_id, relationship)
+    if max_id:
+        endpoint += "&max_id={}".format(max_id)
+
+    # Keep the script bounded so a hanging fetch cannot stall the session.
+    try:
+        browser.set_script_timeout(30)
+    except Exception:
+        pass
+
+    script = (
+        "const done = arguments[arguments.length - 1];"
+        "const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);"
+        "const headers = {'x-ig-app-id': arguments[1],"
+        " 'x-ig-www-claim': '0',"
+        " 'x-requested-with': 'XMLHttpRequest'};"
+        "if (match) { headers['x-csrftoken'] = decodeURIComponent(match[1]); }"
+        "fetch(arguments[0], {credentials: 'include', headers: headers})"
+        ".then(function (response) { return response.text(); })"
+        ".then(function (body) { done(body); })"
+        ".catch(function (error) { done({error: String(error)}); });"
+    )
+
+    try:
+        body = browser.execute_async_script(script, endpoint, _IG_WEB_APP_ID)
+    except Exception as exc:  # a missing/unusable browser must not be fatal
+        logger.info(
+            "In-browser `{}` request failed:\n\t{}".format(
+                relationship.capitalize(), exc
+            )
+        )
+        return None
+
+    if not isinstance(body, str) or not body:
+        return None
+
+    try:
+        return json.loads(body)
+    except ValueError:
+        return None
+
+
+def _get_relationship_page(
+    browser, session, headers, user_id, relationship, max_id, logger
+):
+    """Return one page of relationship data as a dict, or ``None``.
+
+    The ``requests`` session is tried first because it is fast. If Instagram
+    answers with something that is not JSON (a login or challenge page, for
+    instance) the request is repeated from inside the browser, which is served
+    by the account's live session instead of the copied cookies.
+    """
+    endpoint = "{}/friendships/{}/{}/".format(_IG_WEB_API, user_id, relationship)
+    params = {"count": 50}
+    if max_id:
+        params["max_id"] = max_id
+
+    try:
+        response = session.get(endpoint, params=params, headers=headers, timeout=30)
+        update_activity(browser, state=None)
+
+        if response.status_code == 200:
+            try:
+                return response.json()
+            except ValueError:
+                logger.info(
+                    "Instagram `{}` API returned invalid JSON ({})  "
+                    "~retrying in the browser".format(
+                        relationship.capitalize(), _api_failure_detail(response)
+                    )
+                )
+        else:
+            logger.info(
+                "Instagram `{}` API returned HTTP {} for user ID {}  "
+                "~retrying in the browser".format(
+                    relationship.capitalize(), response.status_code, user_id
+                )
+            )
+    except requests.RequestException as exc:
+        logger.info(
+            "Unable to get `{}` data:\n\t{}".format(relationship.capitalize(), exc)
+        )
+
+    return _get_relationship_page_in_browser(
+        browser, user_id, relationship, max_id, logger
+    )
+
+
 def _get_relationship_usernames(
     browser,
     session,
@@ -180,49 +302,17 @@ def _get_relationship_usernames(
     paginates with ``next_max_id``; a ``count`` of 50 is the web app's page
     size. ``amount`` can be ``"full"`` or a positive integer.
     """
-    endpoint = "{}/friendships/{}/{}/".format(_IG_WEB_API, user_id, relationship)
     usernames = []
     max_id = None
     seen_cursors = set()
     complete = True
 
     while True:
-        params = {"count": 50}
-        if max_id:
-            params["max_id"] = max_id
+        data = _get_relationship_page(
+            browser, session, headers, user_id, relationship, max_id, logger
+        )
 
-        try:
-            response = session.get(
-                endpoint, params=params, headers=headers, timeout=30
-            )
-        except requests.RequestException as exc:
-            logger.info(
-                "Unable to get `{}` data:\n\t{}".format(
-                    relationship.capitalize(), exc
-                )
-            )
-            complete = False
-            break
-
-        update_activity(browser, state=None)
-
-        if response.status_code != 200:
-            logger.info(
-                "Instagram `{}` API returned HTTP {} for user ID {}".format(
-                    relationship.capitalize(), response.status_code, user_id
-                )
-            )
-            complete = False
-            break
-
-        try:
-            data = response.json()
-        except ValueError:
-            logger.info(
-                "Instagram `{}` API returned invalid JSON".format(
-                    relationship.capitalize()
-                )
-            )
+        if data is None:
             complete = False
             break
 

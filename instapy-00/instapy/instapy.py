@@ -36,7 +36,12 @@ from selenium.common.exceptions import (
 from . import __version__
 from .browser import close_browser, set_selenium_local_session
 from .clarifai_util import check_image
-from .comment_util import comment_image, get_comments_on_post, process_comments
+from .comment_util import (
+    choose_comment,
+    comment_image,
+    get_comments_on_post,
+    process_comments,
+)
 from .commenters_util import (
     extract_information,
     get_photo_urls_from_profile,
@@ -1517,7 +1522,7 @@ class InstaPy:
                     # dont_skip_business_categories = [] Setted by default
                     # in init
 
-    def set_max_post_age_days(self, days: int = 14):
+    def set_max_post_age_days(self, days: int = 7):
         """Only interact with posts published within the last ``days`` days.
 
         A recent post is treated as proof that the author is still active, so
@@ -1637,6 +1642,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
 
                     if not inappropriate and self.delimit_liking:
@@ -1858,6 +1864,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
                     if not inappropriate:
                         # validate user
@@ -2445,6 +2452,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
 
                     if not inappropriate and self.delimit_liking:
@@ -2725,6 +2733,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
                     track = "post"
 
@@ -3047,6 +3056,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
 
                     if not inappropriate:
@@ -4403,6 +4413,7 @@ class InstaPy:
                                 self.check_character_set,
                                 self.ignore_if_contains,
                                 self.logger,
+                                self.max_post_age_days,
                             )
 
                             if not inappropriate and self.delimit_liking:
@@ -4946,6 +4957,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
 
                     if not inappropriate:
@@ -5078,6 +5090,7 @@ class InstaPy:
                         self.check_character_set,
                         self.ignore_if_contains,
                         self.logger,
+                        self.max_post_age_days,
                     )
 
                     if not inappropriate:
@@ -5202,6 +5215,7 @@ class InstaPy:
                     self.check_character_set,
                     self.ignore_if_contains,
                     self.logger,
+                    self.max_post_age_days,
                 )
 
                 if not inappropriate and self.delimit_liking:
@@ -5764,6 +5778,7 @@ class InstaPy:
                     self.check_character_set,
                     self.ignore_if_contains,
                     self.logger,
+                    self.max_post_age_days,
                 )
 
                 if inappropriate:
@@ -5865,7 +5880,11 @@ class InstaPy:
                         if (
                             self.do_reply_to_comments
                             and reply
-                            and text_analysis_state is True
+                            # ``text_analysis`` returns ``None`` when no
+                            # sentiment/language service is configured. That
+                            # means "analysis unavailable", not "comment is
+                            # inappropriate", so replies must still work.
+                            and text_analysis_state is not False
                         ):
                             do_reply_to_comment = (
                                 self.reply_to_comments_percent >= random.randint(0, 100)
@@ -5884,7 +5903,7 @@ class InstaPy:
                             ]
 
                             if do_reply_to_comment and comment_replies_base:
-                                chosen_reply = random.choice(comment_replies_base)
+                                chosen_reply = choose_comment(comment_replies_base)
                                 # mention the commenter to make a reply :)
                                 reply_msg = ["@{} {}".format(commenter, chosen_reply)]
 
@@ -6195,6 +6214,7 @@ class InstaPy:
                     self.check_character_set,
                     self.ignore_if_contains,
                     self.logger,
+                    self.max_post_age_days,
                 )
 
                 if user_name != self.username:

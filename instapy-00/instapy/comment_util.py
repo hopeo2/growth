@@ -33,6 +33,43 @@ from .util import (
 )
 from .xpath import read_xpath
 
+# Shuffled decks of comments, keyed by the comment list they belong to. Each
+# deck is consumed one comment at a time and refilled only after every comment
+# was posted once, so the same text is not posted repeatedly.
+_comment_decks = {}
+_last_comments = {}
+
+
+def choose_comment(comments):
+    """Return the next comment without repeating recent ones.
+
+    All comments are used once (in random order) before any comment can be
+    chosen again. This prevents the bot from posting the same comment on many
+    posts in a row, which looks spammy and can hurt the account.
+    """
+    if not comments:
+        return ""
+
+    if len(comments) == 1:
+        return comments[0]
+
+    key = tuple(comments)
+    deck = _comment_decks.get(key)
+
+    if not deck:
+        deck = list(comments)
+        random.shuffle(deck)
+        # Do not start a new cycle with the comment that ended the previous
+        # cycle; the deck is consumed from the end.
+        last = _last_comments.get(key)
+        if len(deck) > 1 and deck[-1] == last:
+            deck[-1], deck[0] = deck[0], deck[-1]
+
+    comment = deck.pop()
+    _comment_decks[key] = deck
+    _last_comments[key] = comment
+    return comment
+
 
 def _find_elements_fast(browser, by, value):
     """Find elements without waiting for the full implicit timeout.
@@ -129,7 +166,7 @@ def comment_image(browser, username, comments, blacklist, logger, logfolder):
     if quota_supervisor("comments") == "jump":
         return False, "jumped"
 
-    rand_comment = random.choice(comments).format(username)
+    rand_comment = choose_comment(comments).format(username)
     rand_comment = emoji.demojize(rand_comment)
     try:
         rand_comment = emoji.emojize(rand_comment, use_aliases=True)

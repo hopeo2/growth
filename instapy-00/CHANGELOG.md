@@ -14,9 +14,39 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - `hashtag_engagement.py` now unfollows accounts that have not followed back
   within 3 days (configurable with `--unfollow-after-days`) and records them in
   the follow-restriction table so they are never followed again.
+- `hashtag_engagement.py` gained an extra growth phase that watches stories of
+  followed accounts, likes comments on their recent posts and replies to a
+  percentage of those comments (`--story-accounts`, `--like-comments-*`,
+  `--reply-percentage`, `--replies-file`). Every step has a hard safety ceiling
+  and is skipped when a daily cap or the run time limit is reached.
+- Added `instapy.comment_util.choose_comment()`: comments are now drawn from a
+  shuffled deck, so every comment is posted once before any comment is
+  repeated, and a new cycle never starts with the comment that ended the
+  previous one.
+- Comment replies now work when no sentiment/language service is configured.
+  `text_analysis()` returns `None` when analysis is disabled; `interact_by_comments`
+  previously required it to be exactly `True`, which silently disabled replies.
+- `hashtag_engagement.py` now runs each task as an independent, selectable
+  option: `--hashtags`, `--unfollow`, `--comments`, `--stories` and
+  `--all-tasks`. Tasks can be combined in one run; with no task flag every task
+  runs, so the previous behaviour is unchanged. The run cooldown is now tracked
+  separately per task, so a single-task run is not blocked by another task's
+  recent run, and the hashtag rotation only advances when the hashtag task runs.
+- `hashtag_engagement.py` now sets itself up interactively: run it in a terminal
+  with no task flags and it asks which tasks to run and then walks through the
+  remaining options (tasks, action rates, caps, pacing, headless), showing the
+  current default in brackets so Enter keeps it. Only options relevant to the
+  chosen tasks are asked, answers are validated like flags, and the prompts are
+  skipped for `--dry-run`, `--no-interactive`, scripted/non-terminal runs and
+  runs that already chose tasks with flags.
 
 ### Fixed
 
+- Likes, comments, comment likes and follows now only touch posts published in
+  the last **week**: `hashtag_engagement.py --max-post-age-days` and
+  `set_max_post_age_days()` default to `7` (was `14`), and the activity check is
+  now passed at every `check_link()` call site, so no code path can act on a
+  stale post from an inactive account.
 - The follower/following difference filter no longer blocks likes and comments.
   It is now applied only to the follow decision, so posts from accounts with a
   lopsided ratio are still liked and commented on. This fixes the very low
@@ -27,10 +57,20 @@ _The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 - `hashtag_engagement.py` ships a refreshed set of mutual-support hashtags and
   more varied Persian comments, and inspects up to `5` candidate posts per
   hashtag (was `3`) so a stale top post no longer wastes the whole hashtag.
+- Expanded the built-in hashtag list to 55 tags by adding popular Persian
+  content/lifestyle tags and globally trending growth tags, and expanded the
+  built-in comments from 44 to 72 varied Persian comments plus 12 replies.
 - Replaced the removed `window._sharedData` GraphQL scraping in
   `relationship_tools` with Instagram's web API so follower/following checks
   (and the unfollow step) work again. Unfollowing also no longer aborts when
   the following count cannot be read from the profile page.
+- Follower/following reads no longer silently fail when Instagram answers the
+  private API with an HTML login/challenge page instead of JSON (which made
+  the unfollow step see `0` followers and unfollow nobody). The request now
+  sends the web app's `X-IG-WWW-Claim` header and, if a page still is not JSON,
+  repeats the same call from inside the logged-in browser page so the
+  account's live session and headers are used. Failures now log the HTTP
+  status, content type and a body snippet to make the cause obvious.
 - Removed/unavailable profiles are now detected from the rendered page text,
   so the unfollow step skips them immediately instead of retrying the follow
   button for several minutes.
